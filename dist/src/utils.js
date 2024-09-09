@@ -1,9 +1,9 @@
 if (!("replaceAll" in String.prototype)) {
     String.prototype["replaceAll"] = function (search, replace) {
-        if (typeof search === 'string') {
-            search = search.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        if (typeof search === "string") {
+            search = search.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
         }
-        return this.replace(new RegExp(search, 'g'), replace);
+        return this.replace(new RegExp(search, "g"), replace);
     };
 }
 export const dynamicReplace = (inputString, opts) => {
@@ -11,7 +11,10 @@ export const dynamicReplace = (inputString, opts) => {
     const optsValueQueue = Object.values(opts);
     let resString = inputString;
     while (optsKeyQueue.length && optsValueQueue.length) {
-        const [currKey, currVal] = [optsKeyQueue.pop(), optsValueQueue.pop()];
+        const [currKey, currVal] = [
+            optsKeyQueue.pop(),
+            optsValueQueue.pop(),
+        ];
         resString = resString.replace(currKey, currVal);
     }
     return resString;
@@ -74,7 +77,7 @@ export const dynamicMatch = (inputString, pattern, delimiter, segmentIndicator =
             break;
         }
     }
-    return matchCount === inputChunk.length - 1;
+    return matchCount === inputChunk.length;
 };
 export const wait = (seconds) => {
     return new Promise((res) => {
@@ -82,4 +85,11 @@ export const wait = (seconds) => {
             res();
         }, seconds * 1000);
     });
+};
+export const handleTrailing = (url) => {
+    if (url.length === 1)
+        return url;
+    if (url.endsWith("/"))
+        return url.slice(0, -1);
+    return url;
 };

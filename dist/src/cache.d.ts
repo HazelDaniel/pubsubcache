@@ -1,4 +1,4 @@
-import { GlobalCacheInterface } from "../types";
+import type { GlobalCacheInterface } from "../types";
 import type { RedisClientType } from "redis";
 export declare class RedisCacheClass implements GlobalCacheInterface {
     client: RedisClientType;

@@ -1,9 +1,9 @@
 import { NextFunction, Request, Response } from "express";
-import type { GlobalCacheInterface } from "../types";
+import type { GlobalCacheInterface } from "../types.d.ts";
 interface RoutePubsubCacheOptions {
     delimiter?: string;
 }
-export declare class RoutePubsubCache {
+declare class RoutePubsubCache {
     private subscribers;
     private groupSubscribers;
     private groupingCharacter;
@@ -24,7 +24,7 @@ export declare class RoutePubsubCache {
     readCache(url: string): Promise<string | null>;
     read(url: string): Promise<string>;
 }
-export declare class GlobalRouteCache {
+declare class GlobalRouteCache {
     static delimiter: string;
     private static subHash;
     static deserializer(body: string): unknown;
@@ -34,8 +34,12 @@ export declare class GlobalRouteCache {
     static configureGlobalCacheSerializer: (func: (body: unknown) => string) => void;
     static flushGlobalCache(): Promise<void>;
     static channel: RoutePubsubCache;
-    static createCacheSubscriber(state?: "*"): (req: Request, res: Response, next: NextFunction) => Promise<void>;
-    static createCachePublisher(state?: "*"): (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    static createCacheSubscriber(opts: {
+        catchAll?: boolean;
+    }): (req: Request, res: Response, next: NextFunction) => Promise<void>;
+    static createCachePublisher(opts: {
+        catchAll?: boolean;
+    }): (req: Request, res: Response, next: NextFunction) => Promise<void>;
     static isGenericRoute(url: string): boolean;
     static post(url: string): void;
     static put(url: string): void;
@@ -45,5 +49,5 @@ export declare class GlobalRouteCache {
     static get(url: string): Promise<string | undefined>;
     static subAll(url: string): void;
 }
-export {};
+export { GlobalRouteCache, RoutePubsubCache };
 //# sourceMappingURL=core.d.ts.map

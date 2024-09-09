@@ -8,24 +8,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 var _a;
-import { dynamicMatch, wait } from "./utils.js";
-export class cacheClass {
-    constructor() {
-        this.data = new Map();
-    }
-    evict(key) {
-        if (!this.data.has(key))
-            return;
-        this.data.delete(key);
-    }
-    set(key, value) {
-        this.data.set(key, value);
-    }
-    get(key) {
-        return this.data.get(key);
-    }
-}
-export class RoutePubsubCache {
+import { dynamicMatch, handleTrailing, wait } from "./utils.js";
+import { cacheClass } from "./cache.js";
+const CACHE_PREFIX = `pubsub_cache_:${new Date().getTime()}`;
+class RoutePubsubCache {
     constructor(opts) {
         this.subscribers = new Map();
         this.groupSubscribers = new Map();
@@ -38,7 +24,8 @@ export class RoutePubsubCache {
     }
     isGenericRoute(url) {
         return (url.indexOf(this.groupDelimiter + this.groupingCharacter) !== -1 ||
-            url.indexOf(this.groupDelimiter + this.globCharacter) !== -1);
+            url.indexOf(this.groupDelimiter + this.globCharacter) !== -1 ||
+            url === this.globCharacter);
     }
     subscribe(event, callback) {
         var _b;
@@ -66,17 +53,17 @@ export class RoutePubsubCache {
         (_c = this.groupSubscribers.get(eventGroup)) === null || _c === void 0 ? void 0 : _c.add(callback);
     }
     handleLonePublisher(event) {
-        // nobody subscribed to me explicitly but i am broadcasted nonetheless and i might match a group
+        // nobody subscribed to me explicitly but i am broadcasted nonetheless and i might match a group (or be a group)
         if (!this.isGenericRoute(event)) {
-            // i am just a literal route
+            // I AM JUST A CONCRETE EVENT
             let matchingParentEvents = [...this.groupSubscribers.keys()].filter((e) => {
-                const isMatch = dynamicMatch(event, e, this.groupDelimiter);
+                const isMatch = dynamicMatch(event, e, this.groupDelimiter, this.groupingCharacter);
                 return isMatch;
             });
             const eventParentTreeMemo = new Set();
             for (const parentEvent of matchingParentEvents) {
                 const matchingChildrenEvents2 = [...this.subscribers.entries()].filter(([r, _2]) => {
-                    return dynamicMatch(r, parentEvent, this.groupDelimiter);
+                    return dynamicMatch(r, parentEvent, this.groupDelimiter, this.groupingCharacter);
                 });
                 if (matchingChildrenEvents2.length === 0) {
                     [
@@ -105,35 +92,62 @@ export class RoutePubsubCache {
             }
         }
         else {
-            // i am a pattern
+            // I AM A GROUP EVENT
+            let matchingChildrenEvents;
+            if (event === this.globCharacter) {
+                // I AM A CATCH-ALL EVENT
+                matchingChildrenEvents = [...this.subscribers.entries()];
+            }
+            else {
+                matchingChildrenEvents = [...this.subscribers.entries()].filter(([entry, _2]) => {
+                    const isMatch = dynamicMatch(entry, event, this.groupDelimiter, this.groupingCharacter);
+                    return isMatch;
+                });
+            }
+            for (const [childEvent, subscriberList] of matchingChildrenEvents) {
+                [...subscriberList].forEach((subscriber) => {
+                    subscriber({
+                        cache: this.cache,
+                        routeKeys: [event, childEvent],
+                    });
+                });
+            }
+            if (matchingChildrenEvents.length === 0) {
+                console.warn(`group event: ${event} has no subscribers attached to it`);
+                return;
+            }
         }
         return;
     }
     callback(subscriber, event) {
+        if (!subscriber ||
+            (!this.subscribers.has(event) && !this.groupSubscribers.has(event))) {
+            this.handleLonePublisher(event);
+            return;
+        }
         const ownerSet = this.groupContext.get(subscriber);
         let owner = undefined;
         if (ownerSet && ownerSet.size)
             [owner] = [...ownerSet];
-        if (!this.subscribers.has(event) && !this.groupSubscribers.has(event)) {
-            this.handleLonePublisher(event);
-            return;
-        }
         if (!owner) {
-            subscriber({
-                cache: this.cache,
-                routeKeys: [...(this.context.get(subscriber) || [])],
-            });
+            if (!this.isGenericRoute(event)) {
+                // THIS IS A CONCRETE EVENT
+                subscriber({
+                    cache: this.cache,
+                    routeKeys: [event, ...(ownerSet || [])],
+                });
+                return;
+            }
+            console.warn(`event ${event} is not subscribed by any of the group context`);
             return;
         }
+        // THIS IS A GROUP EVENT
         let matchingChildrenEvents = [...this.subscribers.keys()].filter((e) => {
-            return dynamicMatch(e, owner, this.groupDelimiter) && e === event;
+            return dynamicMatch(e, owner, this.groupDelimiter, this.groupingCharacter);
         });
         subscriber({
             cache: this.cache,
-            routeKeys: [
-                ...this.groupContext.get(subscriber),
-                ...matchingChildrenEvents,
-            ],
+            routeKeys: [...ownerSet, ...matchingChildrenEvents],
         });
     }
     publish(event) {
@@ -141,97 +155,203 @@ export class RoutePubsubCache {
         const netSubscribersMap = new Map();
         if (this.subscribers.has(event)) {
             [...this.subscribers.get(event)].forEach((subscriber) => {
-                netSubscribers.push(subscriber);
+                if (!netSubscribersMap.has(subscriber)) {
+                    netSubscribers.push(subscriber);
+                    netSubscribersMap.set(subscriber, event);
+                }
             });
         }
-        [...this.groupSubscribers.entries()].forEach(([key, matchingSubscribers]) => {
-            if (dynamicMatch(event, key, this.groupDelimiter) &&
-                key !== this.globCharacter) {
-                [...matchingSubscribers].forEach((item) => {
-                    if (!netSubscribersMap.has(item)) {
-                        netSubscribers.push(item);
-                        netSubscribersMap.set(item, 1);
-                    }
-                });
-            }
-        });
+        else if (this.groupSubscribers.has(event)) {
+            // GOING THROUGH SUBSCRIBERS FOR THIS GROUP EVENT
+            [...this.groupSubscribers.get(event)].forEach((s) => {
+                if (!netSubscribersMap.has(s)) {
+                    netSubscribers.push(s);
+                    netSubscribersMap.set(s, event);
+                }
+            });
+            // GOING THROUGH THE MATCHING CHILDREN FOR THIS GROUP EVENT
+            [...this.subscribers.entries()].forEach(([key, matchingSubscribers]) => {
+                if (dynamicMatch(key, event, this.groupDelimiter, this.groupingCharacter) &&
+                    key !== this.globCharacter &&
+                    key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CONCRETE CHILDREN OF THE CURRENT EVENT
+                ) {
+                    [...matchingSubscribers].forEach((item) => {
+                        if (!netSubscribersMap.has(item)) {
+                            netSubscribers.push(item);
+                            netSubscribersMap.set(item, key);
+                        }
+                    });
+                }
+            });
+        }
         const globsubs = this.groupSubscribers.get(this.globCharacter);
         if (globsubs) {
             [...globsubs].forEach((subscriber) => {
                 if (!netSubscribersMap.has(subscriber)) {
                     netSubscribers.push(subscriber);
-                    netSubscribersMap.set(subscriber, 1);
+                    netSubscribersMap.set(subscriber, this.globCharacter);
                 }
             });
         }
         if (netSubscribers.length === 0 ||
             (netSubscribers.length === 1 && !!globsubs)) {
-            console.warn(`event: ${event} has no subscribers attached to it`);
-            return;
+            if (!this.isGenericRoute(event)) {
+                console.warn(`event: ${event} has no subscribers attached to it`);
+                return;
+            }
+            this.callback(null, event);
         }
         netSubscribers.forEach((subscriber) => {
-            this.callback(subscriber, event);
+            this.callback(subscriber, netSubscribersMap.get(subscriber));
         });
     }
     broadcast(url) {
         this.publish(url);
     }
     writeCache(url, data) {
-        this.cache.set(url, data);
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.cache.set(url, data);
+        });
+    }
+    readCache(url) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return yield this.cache.get(url);
+        });
     }
     read(url) {
         return __awaiter(this, void 0, void 0, function* () {
             let data;
-            if (this.cache.get(url)) {
+            if (yield this.cache.get(url)) {
                 return "cached data";
             }
             yield wait(0.3);
             data = "fresh data";
-            this.writeCache(url, data);
+            yield this.writeCache(url, data);
             return data;
         });
     }
 }
-export class GlobalRouteCache {
+class GlobalRouteCache {
+    static deserializer(body) {
+        return body;
+    }
+    static serializer(body) {
+        return body;
+    }
+    static flushGlobalCache() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.subHash.clear(); // RESETTING THE SUBSCRIBERS LOOKUP
+            yield this.channel.cache.cleanup();
+        });
+    }
+    static createCacheSubscriber(opts) {
+        return (req, res, next) => __awaiter(this, void 0, void 0, function* () {
+            let url = (opts === null || opts === void 0 ? void 0 : opts.catchAll) ? req.route.path : req.url;
+            url = handleTrailing(url);
+            // SUBSCRIBING LOGIC
+            //NOTE: SHOULD ONLY SUBSCRIBE ONCE NO MATTER HOW MANY TIMES IT'S CALLED
+            if (!this.subHash.has(url)) {
+                this.sub(url);
+                this.subHash.set(url, 1);
+            }
+            const cachedData = yield this.channel.readCache(url);
+            if (cachedData) {
+                res.locals.cachedResponse = this.deserializer(cachedData);
+            }
+            const originalSend = res.send;
+            const newRes = function (...args) {
+                const [body] = args;
+                if (!res.locals.cachedResponse) {
+                    _a.channel.writeCache(url, _a.serializer({
+                        statusCode: res.statusCode,
+                        headers: res.getHeaders(),
+                        body: body,
+                    })); // NO NEED TO BE AWAITED. WRITING BACK TO CACHE WILL HAPPEN ASYNC
+                }
+                return originalSend.apply(res, [body]);
+            };
+            res.send = newRes;
+            next();
+        });
+    }
+    static createCachePublisher(opts) {
+        return (req, res, next) => __awaiter(this, void 0, void 0, function* () {
+            let url = (opts === null || opts === void 0 ? void 0 : opts.catchAll) ? req.route.path : req.url;
+            url = handleTrailing(url);
+            res.on("finish", () => {
+                if (res.statusCode >= 200 && res.statusCode < 300) {
+                    this.pub(url);
+                }
+            });
+            next();
+        });
+    }
     static isGenericRoute(url) {
-        return (url.indexOf(this.delimiter + ":") !== -1 ||
-            url.indexOf(this.delimiter + "*") !== -1);
+        return this.channel.isGenericRoute(url);
     }
     static post(url) {
+        // ROUTE IMPLEMENTATION
+        // MIDDLEWARE IMPLEMENTATION
         this.channel.broadcast(url);
     }
     static put(url) {
+        // ROUTE IMPLEMENTATION
+        // MIDDLEWARE IMPLEMENTATION
         this.channel.broadcast(url);
     }
     static delete(url) {
+        // ROUTE IMPLEMENTATION
+        // MIDDLEWARE IMPLEMENTATION
         this.channel.broadcast(url);
+    }
+    static pub(url) {
+        // MIDDLEWARE IMPLEMENTATION
+        this.channel.broadcast(url);
+    }
+    static sub(url) {
+        // MIDDLEWARE IMPLEMENTATION
+        if (this.isGenericRoute(url)) {
+            this.subAll(url);
+            return;
+        }
+        this.channel.subscribe(url, (_b) => __awaiter(this, [_b], void 0, function* ({ cache, routeKeys, }) {
+            for (const key of routeKeys) {
+                yield cache.evict(key);
+            }
+        }));
     }
     static get(url) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.isGenericRoute(url)) {
-                this.getAll(url);
-                return;
-            }
-            this.channel.subscribe(url, ({ cache, routeKeys }) => {
-                for (const key of routeKeys) {
-                    cache.evict(key);
-                }
-            });
+            this.sub(url);
             return yield this.channel.read(url);
         });
     }
-    static getAll(url) {
-        this.channel.subscribeGroup(url, ({ cache, routeKeys }) => {
+    static subAll(url) {
+        this.channel.subscribeGroup(url, (_b) => __awaiter(this, [_b], void 0, function* ({ cache, routeKeys, }) {
             for (const key of routeKeys) {
                 if (!this.isGenericRoute(key)) {
-                    cache.evict(key);
+                    yield cache.evict(key);
                 }
             }
-        });
+        }));
     }
 }
 _a = GlobalRouteCache;
 GlobalRouteCache.delimiter = "/";
+GlobalRouteCache.subHash = new Map();
+GlobalRouteCache.configureGlobalCache = function (func) {
+    return __awaiter(this, void 0, void 0, function* () {
+        yield _a.channel.cache.cleanup();
+        _a.channel.cache = func();
+    });
+};
+GlobalRouteCache.configureGlobalCacheDeserializer = function (func) {
+    _a.deserializer = func;
+};
+GlobalRouteCache.configureGlobalCacheSerializer = function (func) {
+    _a.serializer = func;
+};
 GlobalRouteCache.channel = new RoutePubsubCache({
     delimiter: _a.delimiter,
 });
+export { GlobalRouteCache, RoutePubsubCache };
