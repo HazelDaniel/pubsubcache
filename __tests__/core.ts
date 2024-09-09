@@ -1,5 +1,5 @@
-import { RoutePubsubCache, GlobalRouteCache } from "../src/core";
-import {cacheClass} from "../src/cache";
+import { RoutePubsubCache, GlobalRouteCache } from "../src/core.js";
+import {cacheClass} from "../src/cache.js";
 
 // let cache = new RoutePubsubCache();
 describe("RoutePubsubCache", () => {

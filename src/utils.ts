@@ -110,3 +110,9 @@ export const wait = (seconds: number): Promise<void> => {
     }, seconds * 1000);
   });
 };
+
+export const handleTrailing: (url: string) => string = (url) => {
+  if (url.length === 1) return url;
+  if (url.endsWith("/")) return url.slice(0, -1);
+  return url;
+};

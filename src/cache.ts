@@ -1,4 +1,4 @@
-import { GlobalCacheInterface } from "../types";
+import type { GlobalCacheInterface } from "../types";
 import type { RedisClientType } from "redis";
 import { createClient } from "redis";
 

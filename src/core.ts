@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response, Send } from "express";
-import type { GlobalCacheInterface } from "../types";
-import { dynamicMatch, wait } from "./utils";
-import { cacheClass } from "../src/cache";
+import type { GlobalCacheInterface } from "../types.d.ts";
+import { dynamicMatch, handleTrailing, wait } from "./utils.js";
+import { cacheClass } from "./cache.js";
 
 const CACHE_PREFIX = `pubsub_cache_:${new Date().getTime()}`;
 
@@ -9,7 +9,7 @@ interface RoutePubsubCacheOptions {
   delimiter?: string;
 }
 
-export class RoutePubsubCache {
+class RoutePubsubCache {
   private subscribers: Map<string, Set<Function>>;
   private groupSubscribers: Map<string, Set<Function>>;
   private groupingCharacter: string;
@@ -297,7 +297,7 @@ export class RoutePubsubCache {
   }
 }
 
-export class GlobalRouteCache {
+class GlobalRouteCache {
   static delimiter: string = "/";
 
   private static subHash: Map<string, number> = new Map();
@@ -311,21 +311,21 @@ export class GlobalRouteCache {
   }
 
   static configureGlobalCache: (func: () => GlobalCacheInterface) => void =
-    async <T extends GlobalCacheInterface>(func: () => T) => {
-      await this.channel.cache.cleanup();
-      this.channel.cache = func();
+    async function <T extends GlobalCacheInterface>(func: () => T) {
+      await GlobalRouteCache.channel.cache.cleanup();
+      GlobalRouteCache.channel.cache = func();
     };
 
   static configureGlobalCacheDeserializer: (
     func: (body: string) => unknown
-  ) => void = (func) => {
-    this.deserializer = func;
+  ) => void = function (func) {
+    GlobalRouteCache.deserializer = func;
   };
 
   static configureGlobalCacheSerializer: (
     func: (body: unknown) => string
-  ) => void = (func) => {
-    this.serializer = func;
+  ) => void = function (func) {
+    GlobalRouteCache.serializer = func;
   };
 
   static async flushGlobalCache() {
@@ -337,9 +337,11 @@ export class GlobalRouteCache {
     delimiter: this.delimiter,
   });
 
-  static createCacheSubscriber(state?: "*") {
+  static createCacheSubscriber(opts: { catchAll?: boolean }) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      const url = state ? req.route.pattern : req.url;
+      let url = opts?.catchAll ? req.route.path : req.url;
+      url = handleTrailing(url);
+
       // SUBSCRIBING LOGIC
       //NOTE: SHOULD ONLY SUBSCRIBE ONCE NO MATTER HOW MANY TIMES IT'S CALLED
       if (!this.subHash.has(url)) {
@@ -365,7 +367,7 @@ export class GlobalRouteCache {
             })
           ); // NO NEED TO BE AWAITED. WRITING BACK TO CACHE WILL HAPPEN ASYNC
         }
-        return originalSend.apply(res, body);
+        return originalSend.apply(res, [body]);
       };
 
       res.send = newRes;
@@ -374,9 +376,11 @@ export class GlobalRouteCache {
     };
   }
 
-  static createCachePublisher(state?: "*") {
+  static createCachePublisher(opts: { catchAll?: boolean }) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      const url = state ? req.route.pattern : req.url;
+      let url = opts?.catchAll ? req.route.path : req.url;
+      url = handleTrailing(url);
+
       res.on("finish", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           this.pub(url);
@@ -464,3 +468,5 @@ export class GlobalRouteCache {
     );
   }
 }
+
+export { GlobalRouteCache, RoutePubsubCache };
