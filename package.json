@@ -1,7 +1,7 @@
 {
   "name": "pubsubcache",
   "version": "1.0.0",
-  "description": "a pub-sub cache library with write-based cache eviction",
+  "description": "a request caching library that uses a write-based cache eviction strategy based on the pub sub pattern",
   "exports": "./dist/src/core.js",
   "main": "./dist/src/core.js",
   "type": "module",
@@ -14,9 +14,9 @@
     "build": "rm -rf dist && tsc",
     "dev": "tsc -w"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["cache", "caching", "pubsub", "pubsubcache"],
+  "author": "toughware",
+  "license": "GPL-3.0-only",
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@babel/plugin-transform-modules-commonjs": "^7.24.8",
