@@ -339,12 +339,13 @@ class GlobalRouteCache {
 
   static createCacheSubscriber(opts: { catchAll?: boolean }) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      let url = opts?.catchAll ? req.route.path : req.url;
+      let url = opts?.catchAll ? req.baseUrl + req.route.path : req.baseUrl + req.url;
       url = handleTrailing(url);
 
       // SUBSCRIBING LOGIC
       //NOTE: SHOULD ONLY SUBSCRIBE ONCE NO MATTER HOW MANY TIMES IT'S CALLED
       if (!this.subHash.has(url)) {
+        // console.log("registering subscriber to event : ", url);
         this.sub(url);
         this.subHash.set(url, 1);
       }
@@ -378,7 +379,7 @@ class GlobalRouteCache {
 
   static createCachePublisher(opts: { catchAll?: boolean, cascade?: string[] }) {
     return async (req: Request, res: Response, next: NextFunction) => {
-      let url = opts?.catchAll ? req.route.path : req.url;
+      let url = opts?.catchAll ? req.baseUrl + req.route.path : req.baseUrl + req.url;
       url = handleTrailing(url);
 
       res.on("finish", () => {

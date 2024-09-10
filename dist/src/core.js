@@ -246,11 +246,12 @@ class GlobalRouteCache {
     }
     static createCacheSubscriber(opts) {
         return (req, res, next) => __awaiter(this, void 0, void 0, function* () {
-            let url = (opts === null || opts === void 0 ? void 0 : opts.catchAll) ? req.route.path : req.url;
+            let url = (opts === null || opts === void 0 ? void 0 : opts.catchAll) ? req.baseUrl + req.route.path : req.baseUrl + req.url;
             url = handleTrailing(url);
             // SUBSCRIBING LOGIC
             //NOTE: SHOULD ONLY SUBSCRIBE ONCE NO MATTER HOW MANY TIMES IT'S CALLED
             if (!this.subHash.has(url)) {
+                // console.log("registering subscriber to event : ", url);
                 this.sub(url);
                 this.subHash.set(url, 1);
             }
@@ -276,7 +277,7 @@ class GlobalRouteCache {
     }
     static createCachePublisher(opts) {
         return (req, res, next) => __awaiter(this, void 0, void 0, function* () {
-            let url = (opts === null || opts === void 0 ? void 0 : opts.catchAll) ? req.route.path : req.url;
+            let url = (opts === null || opts === void 0 ? void 0 : opts.catchAll) ? req.baseUrl + req.route.path : req.baseUrl + req.url;
             url = handleTrailing(url);
             res.on("finish", () => {
                 if (res.statusCode >= 200 && res.statusCode < 300) {
