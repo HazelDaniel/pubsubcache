@@ -376,7 +376,7 @@ class GlobalRouteCache {
     };
   }
 
-  static createCachePublisher(opts: { catchAll?: boolean }) {
+  static createCachePublisher(opts: { catchAll?: boolean, cascade?: string[] }) {
     return async (req: Request, res: Response, next: NextFunction) => {
       let url = opts?.catchAll ? req.route.path : req.url;
       url = handleTrailing(url);
@@ -384,6 +384,11 @@ class GlobalRouteCache {
       res.on("finish", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
           this.pub(url);
+          if (opts?.cascade)
+          for (let eventUrl of opts.cascade) {
+            eventUrl = handleTrailing(eventUrl);
+            this.pub(eventUrl);
+          }
         }
       });
 

@@ -281,6 +281,11 @@ class GlobalRouteCache {
             res.on("finish", () => {
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                     this.pub(url);
+                    if (opts === null || opts === void 0 ? void 0 : opts.cascade)
+                        for (let eventUrl of opts.cascade) {
+                            eventUrl = handleTrailing(eventUrl);
+                            this.pub(eventUrl);
+                        }
                 }
             });
             next();

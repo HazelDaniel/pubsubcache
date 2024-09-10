@@ -66,10 +66,6 @@ describe("RoutePubsubCache", () => {
         cache.publish("/port/*"); // A GROUP EVENT THAT DOESN'T MATCH ANY SUBSCRIBER WILL NOT TRIGGER THE CATCH-ALL SUBSCRIBER
         expect(totalSubTriggered).toBe(9);
         totalSubTriggered = 0;
-        // cache.subscribeGroup("*", () => {
-        //   // console.log(`//*`);
-        //   totalSubTriggered++;
-        // });
         cache.publish("/users/123");
         cache.publish("/users/:user_id/news/:news_id");
         cache.publish("/users/*/news/*");
@@ -78,6 +74,13 @@ describe("RoutePubsubCache", () => {
         cache.publish("/*");
         cache.publish("*");
         expect(totalSubTriggered).toBe(13);
+        totalSubTriggered = 0;
+        cache.subscribe("/users", () => {
+            // console.log(`//*`);
+            totalSubTriggered++;
+        });
+        cache.publish("/users");
+        expect(totalSubTriggered).toBe(1);
     });
     test("subscribeGroup and publish", () => {
         const mockCallback = jest.fn();

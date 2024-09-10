@@ -39,6 +39,7 @@ declare class GlobalRouteCache {
     }): (req: Request, res: Response, next: NextFunction) => Promise<void>;
     static createCachePublisher(opts: {
         catchAll?: boolean;
+        cascade?: string[];
     }): (req: Request, res: Response, next: NextFunction) => Promise<void>;
     static isGenericRoute(url: string): boolean;
     static post(url: string): void;

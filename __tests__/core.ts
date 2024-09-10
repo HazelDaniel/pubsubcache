@@ -1,5 +1,5 @@
 import { RoutePubsubCache, GlobalRouteCache } from "../src/core.js";
-import {cacheClass} from "../src/cache.js";
+import { cacheClass } from "../src/cache.js";
 
 // let cache = new RoutePubsubCache();
 describe("RoutePubsubCache", () => {
@@ -19,7 +19,7 @@ describe("RoutePubsubCache", () => {
   afterEach(async () => {
     // UNLESS YOU ARE TAMPERING EXPLICITLY WITH THE INTERNAL CACHE, SO:
     await GlobalRouteCache.flushGlobalCache();
-  })
+  });
 
   test("subscribe and publish", () => {
     let totalSubTriggered = 0;
@@ -74,11 +74,6 @@ describe("RoutePubsubCache", () => {
 
     totalSubTriggered = 0;
 
-    // cache.subscribeGroup("*", () => {
-    //   // console.log(`//*`);
-    //   totalSubTriggered++;
-    // });
-
     cache.publish("/users/123");
     cache.publish("/users/:user_id/news/:news_id");
     cache.publish("/users/*/news/*");
@@ -91,6 +86,15 @@ describe("RoutePubsubCache", () => {
 
     expect(totalSubTriggered).toBe(13);
 
+    totalSubTriggered = 0;
+
+    cache.subscribe("/users", () => {
+      // console.log(`//*`);
+      totalSubTriggered++;
+    });
+
+    cache.publish("/users");
+    expect(totalSubTriggered).toBe(1);
   });
 
   test("subscribeGroup and publish", () => {
@@ -122,7 +126,6 @@ describe("RoutePubsubCache", () => {
 });
 
 describe("GlobalRouteCache", () => {
-
   beforeEach(() => {
     // IF YOU ARE CONFIGURING A NEW ROUTE CACHE FOR EVERY TEST
     jest.clearAllMocks();
@@ -132,13 +135,11 @@ describe("GlobalRouteCache", () => {
   afterEach(async () => {
     // THEN YOU SHOULD CLEAN IT UP AFTER EVERY TEST
     await GlobalRouteCache.flushGlobalCache();
-  })
-
+  });
 
   afterAll(async () => {
     console.log("the internal cache is ", GlobalRouteCache.channel.cache);
   });
-
 
   test("get and post", async () => {
     const spy = jest.spyOn(GlobalRouteCache.channel, "broadcast");
