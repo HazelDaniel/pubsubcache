@@ -16,6 +16,14 @@ export class RedisCacheClass implements GlobalCacheInterface {
     });
   }
 
+  deserializer(body: string) {
+    return body as unknown;
+  }
+
+  serializer(body: unknown) {
+    return body as string;
+  }
+
   async get(key: string): Promise<string | null> {
     return new Promise(async (res, rej) => {
       try {
@@ -67,6 +75,14 @@ export class cacheClass implements GlobalCacheInterface {
 
   constructor() {
     this.data = new Map();
+  }
+
+  deserializer(body: string) {
+    return body as unknown;
+  }
+
+  serializer(body: unknown) {
+    return body as string;
   }
 
   async evict(key: string): Promise<void> {

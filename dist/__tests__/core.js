@@ -7,15 +7,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { RoutePubsubCache, GlobalRouteCache } from "../src/core.js";
+import { RoutePubsubChannel, GlobalRouteCache } from "../src/impl.js";
 import { cacheClass } from "../src/cache.js";
-// let cache = new RoutePubsubCache();
-describe("RoutePubsubCache", () => {
+// let cache = new RoutePubsubChannel();
+describe("RoutePubsubChannel", () => {
     let cache;
     beforeEach(() => __awaiter(void 0, void 0, void 0, function* () {
         jest.clearAllMocks();
         GlobalRouteCache.configureGlobalCache(() => new cacheClass());
-        cache = new RoutePubsubCache();
+        cache = new RoutePubsubChannel();
     }));
     afterAll(() => __awaiter(void 0, void 0, void 0, function* () {
         // WILL ALWAYS STAY THE SAME. THE CACHE IS NOT BEING AFFECTED WHEN YOU ARE SUBSCRIBING AND PUBLISHING

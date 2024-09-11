@@ -1,14 +1,14 @@
-import { RoutePubsubCache, GlobalRouteCache } from "../src/core.js";
+import { RoutePubsubChannel, GlobalRouteCache } from "../src/impl.js";
 import { cacheClass } from "../src/cache.js";
 
-// let cache = new RoutePubsubCache();
-describe("RoutePubsubCache", () => {
-  let cache: RoutePubsubCache;
+// let cache = new RoutePubsubChannel();
+describe("RoutePubsubChannel", () => {
+  let cache: RoutePubsubChannel;
 
   beforeEach(async () => {
     jest.clearAllMocks();
     GlobalRouteCache.configureGlobalCache(() => new cacheClass());
-    cache = new RoutePubsubCache();
+    cache = new RoutePubsubChannel();
   });
 
   afterAll(async () => {
