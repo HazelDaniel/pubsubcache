@@ -330,7 +330,7 @@ class GlobalRouteCache {
     }
     static subAll(url) {
         this.channel.subscribeGroup(url, (_b) => __awaiter(this, [_b], void 0, function* ({ cache, routeKeys, }) {
-            const evictPromise = Promise.all(routeKeys.filter(k => !this.isGenericRoute(k)).map(el => cache.evict(el)));
+            const evictPromise = Promise.all(routeKeys.map(el => cache.evict(el)));
             yield evictPromise;
         }));
     }

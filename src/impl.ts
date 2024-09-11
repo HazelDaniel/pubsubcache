@@ -462,7 +462,7 @@ class GlobalRouteCache {
         cache: cacheClass;
         routeKeys: string[];
       }) => {
-        const evictPromise = Promise.all(routeKeys.filter(k => !this.isGenericRoute(k)).map(el => cache.evict(el)));
+        const evictPromise = Promise.all(routeKeys.map(el => cache.evict(el)));
         await evictPromise;
       }
     );
