@@ -1,4 +1,4 @@
-import { GlobalCacheInterface } from "../types";
+import { CachedResponseType, GlobalCacheInterface } from "../types";
 import { NextFunction, Request, Response } from "express";
 interface RoutePubsubChannelOptions {
     delimiter?: string;
@@ -27,11 +27,9 @@ declare class RoutePubsubChannel {
 declare class GlobalRouteCache {
     static delimiter: string;
     private static subHash;
-    static deserializer(body: string): unknown;
-    static serializer(body: unknown): string;
     static configureGlobalCache: (func: () => GlobalCacheInterface) => void;
-    static configureGlobalCacheDeserializer: (func: (body: string) => unknown) => void;
-    static configureGlobalCacheSerializer: (func: (body: unknown) => string) => void;
+    static configureGlobalCacheDeserializer: (func: (body: string) => CachedResponseType) => void;
+    static configureGlobalCacheSerializer: (func: (body: CachedResponseType) => string) => void;
     static flushGlobalCache(): Promise<void>;
     static channel: RoutePubsubChannel;
     static createCacheSubscriber(opts: {

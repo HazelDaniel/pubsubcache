@@ -1,4 +1,4 @@
-import type { GlobalCacheInterface } from "../types";
+import type { CachedResponseType, GlobalCacheInterface } from "../types";
 import type { RedisClientType } from "redis";
 import { createClient } from "redis";
 
@@ -17,10 +17,10 @@ export class RedisCacheClass implements GlobalCacheInterface {
   }
 
   deserializer(body: string) {
-    return body as unknown;
+    return JSON.parse(body) as CachedResponseType;
   }
 
-  serializer(body: unknown) {
+  serializer(body: CachedResponseType) {
     return body as string;
   }
 
@@ -78,11 +78,11 @@ export class cacheClass implements GlobalCacheInterface {
   }
 
   deserializer(body: string) {
-    return body as unknown;
+    return JSON.parse(body) as CachedResponseType;
   }
 
-  serializer(body: unknown) {
-    return body as string;
+  serializer(body: CachedResponseType) {
+    return JSON.stringify(body);
   }
 
   async evict(key: string): Promise<void> {

@@ -18,6 +18,12 @@ export class RedisCacheClass {
             console.log("[REDIS]: a new client acquired");
         });
     }
+    deserializer(body) {
+        return JSON.parse(body);
+    }
+    serializer(body) {
+        return body;
+    }
     get(key) {
         return __awaiter(this, void 0, void 0, function* () {
             return new Promise((res, rej) => __awaiter(this, void 0, void 0, function* () {
@@ -74,6 +80,12 @@ export class RedisCacheClass {
 export class cacheClass {
     constructor() {
         this.data = new Map();
+    }
+    deserializer(body) {
+        return JSON.parse(body);
+    }
+    serializer(body) {
+        return JSON.stringify(body);
     }
     evict(key) {
         return __awaiter(this, void 0, void 0, function* () {

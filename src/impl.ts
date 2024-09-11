@@ -1,4 +1,4 @@
-import { GlobalCacheInterface } from "../types";
+import { CachedResponseType, GlobalCacheInterface } from "../types";
 import { cacheClass } from "./cache.js";
 import { dynamicMatch, handleTrailing, wait } from "./utils.js";
 import { NextFunction, Request, Response, Send } from "express";
@@ -309,13 +309,13 @@ class GlobalRouteCache {
     };
 
   static configureGlobalCacheDeserializer: (
-    func: (body: string) => unknown
+    func: (body: string) => CachedResponseType
   ) => void = function (func) {
     GlobalRouteCache.channel.cache.deserializer = func;
   };
 
   static configureGlobalCacheSerializer: (
-    func: (body: unknown) => string
+    func: (body: CachedResponseType) => string
   ) => void = function (func) {
     GlobalRouteCache.channel.cache.serializer = func;
   };

@@ -172,23 +172,27 @@ await GlobalRouteCache.flushGlobalCache();
 
 ### 2. **Description**
 
-This method opts the endpoint into caching. When first hit, .
-
-> <b>NOTE</b> You might be tempted to do something like `GlobalRouteCache.channel.cache.cleanup()` . This is not advisable as you stand the risk of getting a stale internal state
-> <br/>
+This method subscribes the current endpoint into caching and populates the res.local.cachedResponse field to a value of type [CachedResponseType](#CachedResponseType) for further processing in your route handler.<br/>Your route will always get the same cached data in the res.local.cachedResponse field of the current route handler unless a corresponding `publisher` (usually an equivalent POST/PUT/PATCH/DELETE handler) is set for that endpoint. So, if you just want a time-based caching, you should consider using http headers instead for this route.
 
 ### 3. **Arguments**
 
-- **func**: `void` - this method takes in no arguments.
+- **opts?**: [CachedResponseType](#CachedResponseType) - this is an optional config object to specify the behavior of the current subscription. here are the two types of behaviors you can get based on the these option fields:
+
+  * <b>opts.catchAll</b> : if set, the current subscription will behave like a wild card so that whenever a corresponding `publisher` publishes a matching wildcard, the cache is evicted for all routes matching the current route's wildcard (this corresponds to `req.baseUrl` + `req.route.path` in express)<br/> If not set, the current subscription will only be tied to the literal route (`req.baseUrl` + `req.url`). Consequently, a corresponding `publisher` for this route (whether a 'catchAll' publisher or not - so long as it matches) will be able to trigger a cache eviction for this route
+
+<br/>
+
+> <b>NOTE</b> A parent wildcard publisher...
+> <br/>
 
 ### 4. **Example**
 
 ```js
-// anywhere it makes sense to invoke
+// in your route handlers
 
-await GlobalRouteCache.flushGlobalCache();
+//...
 
-//...  rest of your application
+//...  rest of your code
 ```
 
 ---

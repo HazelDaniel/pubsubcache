@@ -232,12 +232,6 @@ class RoutePubsubChannel {
     }
 }
 class GlobalRouteCache {
-    static deserializer(body) {
-        return body;
-    }
-    static serializer(body) {
-        return body;
-    }
     static flushGlobalCache() {
         return __awaiter(this, void 0, void 0, function* () {
             this.subHash.clear(); // RESETTING THE SUBSCRIBERS LOOKUP
@@ -258,13 +252,13 @@ class GlobalRouteCache {
             }
             const cachedData = yield this.channel.readCache(url);
             if (cachedData) {
-                res.locals.cachedResponse = this.deserializer(cachedData);
+                res.locals.cachedResponse = this.channel.cache.deserializer(cachedData);
             }
             const originalSend = res.send;
             const newRes = function (...args) {
                 const [body] = args;
                 if (!res.locals.cachedResponse) {
-                    _a.channel.writeCache(url, _a.serializer({
+                    _a.channel.writeCache(url, _a.channel.cache.serializer({
                         statusCode: res.statusCode,
                         headers: res.getHeaders(),
                         body: body,
@@ -351,10 +345,10 @@ GlobalRouteCache.configureGlobalCache = function (func) {
     });
 };
 GlobalRouteCache.configureGlobalCacheDeserializer = function (func) {
-    _a.deserializer = func;
+    _a.channel.cache.deserializer = func;
 };
 GlobalRouteCache.configureGlobalCacheSerializer = function (func) {
-    _a.serializer = func;
+    _a.channel.cache.serializer = func;
 };
 GlobalRouteCache.channel = new RoutePubsubChannel({
     delimiter: _a.delimiter,
