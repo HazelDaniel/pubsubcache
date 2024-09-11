@@ -1,6 +1,6 @@
 {
   "name": "express-pubsubcache",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "a request caching library that uses a write-based cache eviction strategy based on the pub sub pattern",
   "exports": "./dist/src/core.js",
   "main": "./dist/src/core.js",
@@ -14,7 +14,12 @@
     "build": "rm -rf dist && tsc",
     "dev": "tsc -w"
   },
-  "keywords": ["cache", "caching", "pubsub", "pubsubcache"],
+  "keywords": [
+    "cache",
+    "caching",
+    "pubsub",
+    "pubsubcache"
+  ],
   "author": "toughware",
   "license": "GPL-3.0-only",
   "devDependencies": {
