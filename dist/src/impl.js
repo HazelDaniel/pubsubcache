@@ -53,75 +53,46 @@ class RoutePubsubChannel {
         (_c = this.groupSubscribers.get(eventGroup)) === null || _c === void 0 ? void 0 : _c.add(callback);
     }
     handleLonePublisher(event) {
-        // nobody subscribed to me explicitly but i am broadcasted nonetheless and i might match a group (or be a group)
-        if (!this.isGenericRoute(event)) {
-            // I AM JUST A CONCRETE EVENT
-            let matchingParentEvents = [...this.groupSubscribers.keys()].filter((e) => {
-                const isMatch = dynamicMatch(event, e, this.groupDelimiter, this.groupingCharacter);
-                return isMatch;
-            });
-            const eventParentTreeMemo = new Set();
-            for (const parentEvent of matchingParentEvents) {
-                const matchingChildrenEvents2 = [...this.subscribers.entries()].filter(([r, _2]) => {
-                    return dynamicMatch(r, parentEvent, this.groupDelimiter, this.groupingCharacter);
-                });
-                if (matchingChildrenEvents2.length === 0) {
-                    [
-                        ...this.groupSubscribers.get(parentEvent),
-                    ].forEach((subscriber) => {
-                        subscriber({
-                            cache: this.cache,
-                            routeKeys: [parentEvent, event],
-                        });
-                    });
-                }
-                for (const [route, subscriberList] of matchingChildrenEvents2) {
-                    if (!eventParentTreeMemo.has(route)) {
-                        subscriberList.forEach((subscriber) => {
-                            subscriber({
-                                cache: this.cache,
-                                routeKeys: eventParentTreeMemo.has(event)
-                                    ? [route]
-                                    : [route, event],
-                            });
-                        });
-                    }
-                    eventParentTreeMemo.add(event);
-                    eventParentTreeMemo.add(route);
-                }
-            }
+        // i'm a wildcard event. nobody subscribed to me explicitly but i am broadcasted nonetheless and i might match other children group/literal events
+        var _b;
+        let matchingChildrenEvents;
+        if (event === this.globCharacter) {
+            // I AM A CATCH-ALL EVENT
+            matchingChildrenEvents = [...this.subscribers.entries()];
         }
         else {
-            // I AM A GROUP EVENT
-            let matchingChildrenEvents;
-            if (event === this.globCharacter) {
-                // I AM A CATCH-ALL EVENT
-                matchingChildrenEvents = [...this.subscribers.entries()];
-            }
-            else {
-                matchingChildrenEvents = [...this.subscribers.entries()].filter(([entry, _2]) => {
-                    const isMatch = dynamicMatch(entry, event, this.groupDelimiter, this.groupingCharacter);
-                    return isMatch;
+            matchingChildrenEvents = [...this.subscribers.entries()].filter(([entry, _2]) => {
+                const isMatch = dynamicMatch(entry, event, this.groupDelimiter, this.groupingCharacter);
+                return isMatch;
+            });
+        }
+        for (const [childEvent, subscriberList] of matchingChildrenEvents) {
+            [...subscriberList].forEach((subscriber) => {
+                subscriber({
+                    cache: this.cache,
+                    routeKeys: [event, childEvent],
                 });
-            }
-            for (const [childEvent, subscriberList] of matchingChildrenEvents) {
-                [...subscriberList].forEach((subscriber) => {
-                    subscriber({
-                        cache: this.cache,
-                        routeKeys: [event, childEvent],
-                    });
+            });
+        }
+        if (matchingChildrenEvents.length && event !== this.globCharacter) { // A SPECIAL CASE THAT COULDN'T BE HANDLED IN THE 'callback' METHOD WITHOUT RISKING PERFORMANCE
+            (_b = (this.groupSubscribers.get(this.globCharacter))) === null || _b === void 0 ? void 0 : _b.forEach(sub => {
+                sub({
+                    cache: this.cache,
+                    routeKeys: [event, this.globCharacter]
                 });
-            }
-            if (matchingChildrenEvents.length === 0) {
-                console.warn(`group event: ${event} has no subscribers attached to it`);
-                return;
-            }
+            });
+        }
+        if (matchingChildrenEvents.length === 0) {
+            console.warn(`group event: ${event} has no subscribers attached to it`);
+            return;
         }
         return;
     }
-    callback(subscriber, event) {
+    callback(subscriber, event, opts) {
         if (!subscriber ||
             (!this.subscribers.has(event) && !this.groupSubscribers.has(event))) {
+            if (opts === null || opts === void 0 ? void 0 : opts.freeze)
+                return; // THIS EXACT EVENT DOESN'T EXIST AND WE'RE ONLY MACHING EXACT GROUP EVENTS IF FREEZE IS SET
             this.handleLonePublisher(event);
             return;
         }
@@ -150,9 +121,10 @@ class RoutePubsubChannel {
             routeKeys: [...ownerSet, ...matchingChildrenEvents],
         });
     }
-    publish(event) {
+    publish(event, freeze) {
         const netSubscribers = [];
         const netSubscribersMap = new Map();
+        freeze = !!freeze;
         if (this.subscribers.has(event)) {
             [...this.subscribers.get(event)].forEach((subscriber) => {
                 if (!netSubscribersMap.has(subscriber)) {
@@ -169,23 +141,39 @@ class RoutePubsubChannel {
                     netSubscribersMap.set(s, event);
                 }
             });
-            // GOING THROUGH THE MATCHING CHILDREN FOR THIS GROUP EVENT
-            [...this.subscribers.entries()].forEach(([key, matchingSubscribers]) => {
-                if (dynamicMatch(key, event, this.groupDelimiter, this.groupingCharacter) &&
-                    key !== this.globCharacter &&
-                    key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CONCRETE CHILDREN OF THE CURRENT EVENT
-                ) {
-                    [...matchingSubscribers].forEach((item) => {
-                        if (!netSubscribersMap.has(item)) {
-                            netSubscribers.push(item);
-                            netSubscribersMap.set(item, key);
-                        }
-                    });
-                }
-            });
+            if (!freeze) {
+                // GOING THROUGH THE MATCHING CHILDREN FOR THIS GROUP EVENT
+                [...this.subscribers.entries()].forEach(([key, matchingSubscribers]) => {
+                    if (dynamicMatch(key, event, this.groupDelimiter, this.groupingCharacter) &&
+                        key !== this.globCharacter &&
+                        key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CONCRETE CHILDREN OF THE CURRENT EVENT
+                    ) {
+                        [...matchingSubscribers].forEach((item) => {
+                            if (!netSubscribersMap.has(item)) {
+                                netSubscribers.push(item);
+                                netSubscribersMap.set(item, key);
+                            }
+                        });
+                    }
+                });
+                // GOING THROUGH THE MATCHING CHILDREN GROUP EVENTS FOR THIS GROUP EVENT
+                [...this.groupSubscribers.entries()].forEach(([key, matchingSubscribers]) => {
+                    if (dynamicMatch(key, event, this.groupDelimiter, this.groupingCharacter) &&
+                        key !== this.globCharacter &&
+                        key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CHILDREN OF THE CURRENT EVENT
+                    ) {
+                        [...matchingSubscribers].forEach((item) => {
+                            if (!netSubscribersMap.has(item)) {
+                                netSubscribers.push(item);
+                                netSubscribersMap.set(item, key);
+                            }
+                        });
+                    }
+                });
+            }
         }
         const globsubs = this.groupSubscribers.get(this.globCharacter);
-        if (globsubs) {
+        if (globsubs && !!netSubscribers.length && !freeze) { // THIS WON'T WORK WITH LONE WILDCARD EVENTS SO, IT WILL BE HANDLED SEPARATELY FOR THEM IN THE `handleLonePublisher`
             [...globsubs].forEach((subscriber) => {
                 if (!netSubscribersMap.has(subscriber)) {
                     netSubscribers.push(subscriber);
@@ -193,20 +181,19 @@ class RoutePubsubChannel {
                 }
             });
         }
-        if (netSubscribers.length === 0 ||
-            (netSubscribers.length === 1 && !!globsubs)) {
-            if (!this.isGenericRoute(event)) {
+        if (netSubscribers.length === 0) {
+            if (!this.isGenericRoute(event)) { // this.handleLonePublisher DEPENDS ON THIS SO, IT JUST FOCUSES ON WILDCARD EVENTS
                 console.warn(`event: ${event} has no subscribers attached to it`);
                 return;
             }
-            this.callback(null, event);
+            this.callback(null, event, { freeze });
         }
         netSubscribers.forEach((subscriber) => {
-            this.callback(subscriber, netSubscribersMap.get(subscriber));
+            this.callback(subscriber, netSubscribersMap.get(subscriber), { freeze });
         });
     }
-    broadcast(url) {
-        this.publish(url);
+    broadcast(url, freeze) {
+        this.publish(url, freeze);
     }
     writeCache(url, data) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -247,7 +234,7 @@ class GlobalRouteCache {
             // SUBSCRIBING LOGIC
             //NOTE: SHOULD ONLY SUBSCRIBE ONCE NO MATTER HOW MANY TIMES IT'S CALLED
             if (!this.subHash.has(url)) {
-                this.sub(url);
+                _a.sub(url);
                 this.subHash.set(url, 1);
             }
             const cachedData = yield this.channel.readCache(url);
@@ -278,11 +265,11 @@ class GlobalRouteCache {
             url = handleTrailing(url);
             res.on("finish", () => {
                 if (res.statusCode >= 200 && res.statusCode < 300) {
-                    this.pub(url);
+                    this.pub(url, opts === null || opts === void 0 ? void 0 : opts.freeze);
                     if (opts === null || opts === void 0 ? void 0 : opts.cascade)
                         for (let eventUrl of opts.cascade) {
                             eventUrl = handleTrailing(eventUrl);
-                            this.pub(eventUrl);
+                            this.pub(eventUrl, opts === null || opts === void 0 ? void 0 : opts.freeze);
                         }
                 }
             });
@@ -307,14 +294,14 @@ class GlobalRouteCache {
         // MIDDLEWARE IMPLEMENTATION
         this.channel.broadcast(url);
     }
-    static pub(url) {
+    static pub(url, freeze) {
         // MIDDLEWARE IMPLEMENTATION
-        this.channel.broadcast(url);
+        this.channel.broadcast(url, freeze);
     }
     static sub(url) {
         // MIDDLEWARE IMPLEMENTATION
         if (this.isGenericRoute(url)) {
-            this.subAll(url);
+            _a.subAll(url);
             return;
         }
         this.channel.subscribe(url, (_b) => __awaiter(this, [_b], void 0, function* ({ cache, routeKeys, }) {
@@ -324,7 +311,7 @@ class GlobalRouteCache {
     }
     static get(url) {
         return __awaiter(this, void 0, void 0, function* () {
-            this.sub(url);
+            _a.sub(url);
             return yield this.channel.read(url);
         });
     }

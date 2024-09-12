@@ -1,26 +1,29 @@
 import { GlobalRouteCache as OriginalGlobalRouteCache } from "./impl.js";
 
 const handler: ProxyHandler<typeof OriginalGlobalRouteCache> = {
-  set(target, prop) {
+  set(target, prop, _1, receiver) {
+    if (target !== receiver) {
+      throw new Error(
+        `Setting property '${prop.toString()}' is restricted to internal implementation only!`
+      );
+    }
+    return target[prop];
+  },
+  get(target, prop, receiver) {
     const restrictedProps: Set<string | symbol> = new Set([
-      "delimiter",
-      "deserializer",
-      "serializer",
-      "channel",
       "get",
       "post",
       "put",
       "delete",
-      "pub",
       "sub",
       "subAll",
     ]);
-    if (restrictedProps.has(prop)) {
+    if (restrictedProps.has(prop) && target !== receiver) {
       throw new Error(
-        `Property '${prop.toString()}' is restricted to internal implementation only!`
+        "you can't access the 'sub' method from outside the internal implementation"
       );
     }
-    return target[prop];
+    return Reflect.get(target, prop, receiver);
   },
 };
 

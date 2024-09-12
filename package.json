@@ -10,7 +10,7 @@
   ],
   "types": "./dist/src/core.d.ts",
   "scripts": {
-    "test": "tsc && npx jest",
+    "test": "rm -rf dist && tsc && npx jest",
     "build": "rm -rf dist && tsc",
     "dev": "tsc -w"
   },

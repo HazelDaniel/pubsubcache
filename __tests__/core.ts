@@ -25,24 +25,29 @@ describe("RoutePubsubChannel", () => {
     let totalSubTriggered = 0;
 
     cache.subscribeGroup("/*", () => {
-      // console.log(`///*`);
+      console.log(`/* evicting...`);
+      totalSubTriggered++;
+    });
+
+    cache.subscribeGroup("*", () => {
+      console.log(`* evicting...`);
       totalSubTriggered++;
     });
 
     cache.subscribeGroup("/users/:user_id", ({ cache, routeKeys }) => {
-      // console.log(`///users/:user_id`);
+      console.log(`/users/:user_id evicting...`);
       totalSubTriggered++;
     });
     cache.subscribe("/users/123", ({ cache, routeKeys }) => {
-      // console.log(`///users/123`);
+      console.log(`/users/123 evicting...`);
       totalSubTriggered++;
     });
     cache.subscribe("/users/124", ({ cache, routeKeys }) => {
-      // console.log(`///users/124`);
+      console.log(`/users/124 evicting...`);
       totalSubTriggered++;
     });
     cache.subscribe("/users/124/news/0", () => {
-      // console.log(`///users/124/news/0`);
+      console.log(`/users/124/news/0 evicting...`);
       totalSubTriggered++;
     });
 
@@ -55,22 +60,22 @@ describe("RoutePubsubChannel", () => {
     cache.publish("/*");
     cache.publish("*");
 
-    expect(totalSubTriggered).toBe(13);
+    expect(totalSubTriggered).toBe(22);
 
     totalSubTriggered = 0;
 
     cache.publish("/users/:user_id");
     cache.publish("/users/:user_id");
-    expect(totalSubTriggered).toBe(6);
+    expect(totalSubTriggered).toBe(8);
 
     totalSubTriggered = 0;
 
     cache.publish("/users/:user_id");
-    cache.publish("/users/:user_id");
+    cache.publish("/users/*");
     cache.publish("/users/:user_id");
     cache.publish("/users/129"); // AN EVENT THAT DOESN'T EXIST (AND IS NOT A GROUP EVENT) WILL NOT TRIGGER THE CATCH-ALL SUBSCRIBER
     cache.publish("/port/*"); // A GROUP EVENT THAT DOESN'T MATCH ANY SUBSCRIBER WILL NOT TRIGGER THE CATCH-ALL SUBSCRIBER
-    expect(totalSubTriggered).toBe(9);
+    expect(totalSubTriggered).toBe(12);
 
     totalSubTriggered = 0;
 
@@ -84,7 +89,7 @@ describe("RoutePubsubChannel", () => {
     cache.publish("/*");
     cache.publish("*");
 
-    expect(totalSubTriggered).toBe(13);
+    expect(totalSubTriggered).toBe(22);
 
     totalSubTriggered = 0;
 
@@ -94,7 +99,21 @@ describe("RoutePubsubChannel", () => {
     });
 
     cache.publish("/users");
-    expect(totalSubTriggered).toBe(1);
+    expect(totalSubTriggered).toBe(2);
+
+    totalSubTriggered = 0;
+
+    cache.publish("/users/123", true);
+    cache.publish("/users/:user_id/news/:news_id", true);
+    cache.publish("/users/*/news/*", true);
+    cache.publish("/users/:user_id", true);
+
+    cache.publish("/levels/2", true); // AN EVENT THAT DOESN'T EXIST (AND IS NOT A GROUP EVENT) WILL NOT TRIGGER THE CATCH-ALL SUBSCRIBER
+
+    cache.publish("/*", true);
+    cache.publish("*", true);
+
+    expect(totalSubTriggered).toBe(4);
   });
 
   test("subscribeGroup and publish", () => {

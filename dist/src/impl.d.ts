@@ -17,9 +17,11 @@ declare class RoutePubsubChannel {
     subscribe(event: string, callback: Function): void;
     subscribeGroup(eventGroup: string, callback: Function): void;
     handleLonePublisher(event: string): void;
-    callback(subscriber: Function | null, event: string): void;
-    publish(event: string): void;
-    broadcast(url: string): void;
+    callback(subscriber: Function | null, event: string, opts?: {
+        freeze?: boolean;
+    }): void;
+    publish(event: string, freeze?: boolean): void;
+    broadcast(url: string, freeze?: boolean): void;
     writeCache(url: string, data: any): Promise<void>;
     readCache(url: string): Promise<string | null>;
     read(url: string): Promise<string>;
@@ -38,12 +40,13 @@ declare class GlobalRouteCache {
     static createCachePublisher(opts: {
         catchAll?: boolean;
         cascade?: string[];
+        freeze?: boolean;
     }): (req: Request, res: Response, next: NextFunction) => Promise<void>;
     static isGenericRoute(url: string): boolean;
     static post(url: string): void;
     static put(url: string): void;
     static delete(url: string): void;
-    static pub(url: string): void;
+    static pub(url: string, freeze?: boolean): void;
     static sub(url: string): void;
     static get(url: string): Promise<string | undefined>;
     static subAll(url: string): void;

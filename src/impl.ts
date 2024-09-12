@@ -71,101 +71,58 @@ class RoutePubsubChannel {
   }
 
   handleLonePublisher(event: string): void {
-    // nobody subscribed to me explicitly but i am broadcasted nonetheless and i might match a group (or be a group)
-    if (!this.isGenericRoute(event)) {
-      // I AM JUST A CONCRETE EVENT
-      let matchingParentEvents = [...this.groupSubscribers.keys()].filter(
-        (e) => {
+    // i'm a wildcard event. nobody subscribed to me explicitly but i am broadcasted nonetheless and i might match other children group/literal events
+
+    let matchingChildrenEvents: Array<[string, Set<Function>]>;
+
+    if (event === this.globCharacter) {
+      // I AM A CATCH-ALL EVENT
+      matchingChildrenEvents = [...this.subscribers.entries()];
+    } else {
+      matchingChildrenEvents = [...this.subscribers.entries()].filter(
+        ([entry, _2]) => {
           const isMatch = dynamicMatch(
+            entry,
             event,
-            e,
             this.groupDelimiter,
             this.groupingCharacter
           );
           return isMatch;
         }
       );
-      const eventParentTreeMemo = new Set();
-      for (const parentEvent of matchingParentEvents) {
-        const matchingChildrenEvents2 = [...this.subscribers.entries()].filter(
-          ([r, _2]) => {
-            return dynamicMatch(
-              r,
-              parentEvent,
-              this.groupDelimiter,
-              this.groupingCharacter
-            );
-          }
-        );
+    }
 
-        if (matchingChildrenEvents2.length === 0) {
-          [
-            ...(this.groupSubscribers.get(parentEvent) as Set<Function>),
-          ].forEach((subscriber) => {
-            subscriber({
-              cache: this.cache,
-              routeKeys: [parentEvent, event],
-            });
-          });
-        }
-
-        for (const [route, subscriberList] of matchingChildrenEvents2) {
-          if (!eventParentTreeMemo.has(route)) {
-            subscriberList.forEach((subscriber) => {
-              subscriber({
-                cache: this.cache,
-                routeKeys: eventParentTreeMemo.has(event)
-                  ? [route]
-                  : [route, event],
-              });
-            });
-          }
-          eventParentTreeMemo.add(event);
-          eventParentTreeMemo.add(route);
-        }
-      }
-    } else {
-      // I AM A GROUP EVENT
-      let matchingChildrenEvents: Array<[string, Set<Function>]>;
-
-      if (event === this.globCharacter) {
-        // I AM A CATCH-ALL EVENT
-        matchingChildrenEvents = [...this.subscribers.entries()];
-      } else {
-        matchingChildrenEvents = [...this.subscribers.entries()].filter(
-          ([entry, _2]) => {
-            const isMatch = dynamicMatch(
-              entry,
-              event,
-              this.groupDelimiter,
-              this.groupingCharacter
-            );
-            return isMatch;
-          }
-        );
-      }
-
-      for (const [childEvent, subscriberList] of matchingChildrenEvents) {
-        [...subscriberList].forEach((subscriber) => {
-          subscriber({
-            cache: this.cache,
-            routeKeys: [event, childEvent],
-          });
+    for (const [childEvent, subscriberList] of matchingChildrenEvents) {
+      [...subscriberList].forEach((subscriber) => {
+        subscriber({
+          cache: this.cache,
+          routeKeys: [event, childEvent],
         });
-      }
-      if (matchingChildrenEvents.length === 0) {
-        console.warn(`group event: ${event} has no subscribers attached to it`);
-        return;
-      }
+      });
+    }
+
+    if (matchingChildrenEvents.length && event !== this.globCharacter) { // A SPECIAL CASE THAT COULDN'T BE HANDLED IN THE 'callback' METHOD WITHOUT RISKING PERFORMANCE
+      (this.groupSubscribers.get(this.globCharacter))?.forEach(sub => {
+        sub({
+          cache: this.cache,
+          routeKeys: [event, this.globCharacter]
+        })
+      })
+    }
+
+    if (matchingChildrenEvents.length === 0) {
+      console.warn(`group event: ${event} has no subscribers attached to it`);
+      return;
     }
     return;
   }
 
-  callback(subscriber: Function | null, event: string): void {
+  callback(subscriber: Function | null, event: string, opts?: {freeze?: boolean}): void {
     if (
       !subscriber ||
       (!this.subscribers.has(event) && !this.groupSubscribers.has(event))
     ) {
+      if (opts?.freeze) return; // THIS EXACT EVENT DOESN'T EXIST AND WE'RE ONLY MACHING EXACT GROUP EVENTS IF FREEZE IS SET
       this.handleLonePublisher(event);
       return;
     }
@@ -205,9 +162,10 @@ class RoutePubsubChannel {
     });
   }
 
-  publish(event: string): void {
+  publish(event: string, freeze?: boolean): void {
     const netSubscribers: Function[] = [];
     const netSubscribersMap = new Map<Function, string>();
+    freeze = !!freeze;
 
     if (this.subscribers.has(event)) {
       [...this.subscribers.get(event)!].forEach((subscriber) => {
@@ -225,30 +183,54 @@ class RoutePubsubChannel {
         }
       });
 
-      // GOING THROUGH THE MATCHING CHILDREN FOR THIS GROUP EVENT
-      [...this.subscribers.entries()].forEach(([key, matchingSubscribers]) => {
-        if (
-          dynamicMatch(
-            key,
-            event,
-            this.groupDelimiter,
-            this.groupingCharacter
-          ) &&
-          key !== this.globCharacter &&
-          key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CONCRETE CHILDREN OF THE CURRENT EVENT
-        ) {
-          [...matchingSubscribers].forEach((item) => {
-            if (!netSubscribersMap.has(item)) {
-              netSubscribers.push(item);
-              netSubscribersMap.set(item, key);
-            }
-          });
-        }
-      });
+      if (!freeze) {
+        // GOING THROUGH THE MATCHING CHILDREN FOR THIS GROUP EVENT
+        [...this.subscribers.entries()].forEach(([key, matchingSubscribers]) => {
+          if (
+            dynamicMatch(
+              key,
+              event,
+              this.groupDelimiter,
+              this.groupingCharacter
+            ) &&
+            key !== this.globCharacter &&
+            key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CONCRETE CHILDREN OF THE CURRENT EVENT
+          ) {
+            [...matchingSubscribers].forEach((item) => {
+              if (!netSubscribersMap.has(item)) {
+                netSubscribers.push(item);
+                netSubscribersMap.set(item, key);
+              }
+            });
+          }
+        });
+  
+  
+        // GOING THROUGH THE MATCHING CHILDREN GROUP EVENTS FOR THIS GROUP EVENT
+        [...this.groupSubscribers.entries()].forEach(([key, matchingSubscribers]) => {
+          if (
+            dynamicMatch(
+              key,
+              event,
+              this.groupDelimiter,
+              this.groupingCharacter
+            ) &&
+            key !== this.globCharacter &&
+            key !== event // THIS GUARANTEES THAT WE'LL BE GOING THROUGH CHILDREN OF THE CURRENT EVENT
+          ) {
+            [...matchingSubscribers].forEach((item) => {
+              if (!netSubscribersMap.has(item)) {
+                netSubscribers.push(item);
+                netSubscribersMap.set(item, key);
+              }
+            });
+          }
+        });
+      }
     }
 
     const globsubs = this.groupSubscribers.get(this.globCharacter);
-    if (globsubs) {
+    if (globsubs && !!netSubscribers.length && !freeze) { // THIS WON'T WORK WITH LONE WILDCARD EVENTS SO, IT WILL BE HANDLED SEPARATELY FOR THEM IN THE `handleLonePublisher`
       [...globsubs].forEach((subscriber) => {
         if (!netSubscribersMap.has(subscriber)) {
           netSubscribers.push(subscriber);
@@ -258,23 +240,22 @@ class RoutePubsubChannel {
     }
 
     if (
-      netSubscribers.length === 0 ||
-      (netSubscribers.length === 1 && !!globsubs)
+      netSubscribers.length === 0
     ) {
-      if (!this.isGenericRoute(event)) {
+      if (!this.isGenericRoute(event)) { // this.handleLonePublisher DEPENDS ON THIS SO, IT JUST FOCUSES ON WILDCARD EVENTS
         console.warn(`event: ${event} has no subscribers attached to it`);
         return;
       }
-      this.callback(null, event);
+      this.callback(null, event, {freeze});
     }
 
     netSubscribers.forEach((subscriber) => {
-      this.callback(subscriber, netSubscribersMap.get(subscriber)!);
+      this.callback(subscriber, netSubscribersMap.get(subscriber)!, {freeze});
     });
   }
 
-  broadcast(url: string): void {
-    this.publish(url);
+  broadcast(url: string, freeze?: boolean): void {
+    this.publish(url, freeze);
   }
 
   async writeCache(url: string, data: any): Promise<void> {
@@ -339,7 +320,7 @@ class GlobalRouteCache {
       // SUBSCRIBING LOGIC
       //NOTE: SHOULD ONLY SUBSCRIBE ONCE NO MATTER HOW MANY TIMES IT'S CALLED
       if (!this.subHash.has(url)) {
-        this.sub(url);
+        GlobalRouteCache.sub(url);
         this.subHash.set(url, 1);
       }
 
@@ -373,6 +354,7 @@ class GlobalRouteCache {
   static createCachePublisher(opts: {
     catchAll?: boolean;
     cascade?: string[];
+    freeze?: boolean;
   }) {
     return async (req: Request, res: Response, next: NextFunction) => {
       let url = opts?.catchAll
@@ -382,11 +364,11 @@ class GlobalRouteCache {
 
       res.on("finish", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          this.pub(url);
+          this.pub(url, opts?.freeze);
           if (opts?.cascade)
             for (let eventUrl of opts.cascade) {
               eventUrl = handleTrailing(eventUrl);
-              this.pub(eventUrl);
+              this.pub(eventUrl, opts?.freeze);
             }
         }
       });
@@ -420,15 +402,15 @@ class GlobalRouteCache {
     this.channel.broadcast(url);
   }
 
-  static pub(url: string): void {
+  static pub(url: string, freeze?: boolean): void {
     // MIDDLEWARE IMPLEMENTATION
-    this.channel.broadcast(url);
+    this.channel.broadcast(url, freeze);
   }
 
   static sub(url: string): void {
     // MIDDLEWARE IMPLEMENTATION
     if (this.isGenericRoute(url)) {
-      this.subAll(url);
+      GlobalRouteCache.subAll(url);
       return;
     }
 
@@ -448,7 +430,7 @@ class GlobalRouteCache {
   }
 
   static async get(url: string): Promise<string | undefined> {
-    this.sub(url);
+    GlobalRouteCache.sub(url);
     return await this.channel.read(url);
   }
 
