@@ -1,6 +1,6 @@
 {
   "name": "express-pubsubcache",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "a request caching library that uses a write-based cache eviction strategy based on the pub sub pattern",
   "exports": "./dist/src/core.js",
   "main": "./dist/src/core.js",
