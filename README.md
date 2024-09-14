@@ -428,27 +428,33 @@ app.delete(
   </br>
 
 # Types
+
 Work in progress...
 
 </br>
 </br>
 
 # Changelog
-Work in progress...
 
 - ### v1.0.0
-  - 1
-  ***
-  - 2
-  ***
-  - 3
-  ***
+
+  - @`1.x.x` first iterations (unstable).
+
+
+  </br>
+
 - ### v2.0.0
-  - 1
+
+  - @`2.0.0` wrapped the original GlobalRouteCache class into a proxy class that intercepts the override of any of the apis.<br/>optimized the cache eviction logic for a group of routes.
+
   ***
-  - 2
-  ***
-  - 3
-  ***
+
+  - @`2.0.1` updated types, adjusted implementation to accomodate changes
+
+
+  </br>
+
+- ### v3.0.0
+  - @`3.0.0` updated types, added more options in methods, updated the proxy object to prohibit users from accessing some internal methods. updated the code to allow children wildcard events be triggered when a wildcard is published, added a 'freeze' flag to make allow for eviction of just the literal wildcard events without cascade, exposed more apis for extended usage. updated the test suite
   </br>
   </br>
