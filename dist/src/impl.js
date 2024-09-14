@@ -74,11 +74,12 @@ class RoutePubsubChannel {
                 });
             });
         }
-        if (matchingChildrenEvents.length && event !== this.globCharacter) { // A SPECIAL CASE THAT COULDN'T BE HANDLED IN THE 'callback' METHOD WITHOUT RISKING PERFORMANCE
-            (_b = (this.groupSubscribers.get(this.globCharacter))) === null || _b === void 0 ? void 0 : _b.forEach(sub => {
+        if (matchingChildrenEvents.length && event !== this.globCharacter) {
+            // A SPECIAL CASE THAT COULDN'T BE HANDLED IN THE 'callback' METHOD WITHOUT RISKING PERFORMANCE
+            (_b = this.groupSubscribers.get(this.globCharacter)) === null || _b === void 0 ? void 0 : _b.forEach((sub) => {
                 sub({
                     cache: this.cache,
-                    routeKeys: [event, this.globCharacter]
+                    routeKeys: [event, this.globCharacter],
                 });
             });
         }
@@ -173,7 +174,8 @@ class RoutePubsubChannel {
             }
         }
         const globsubs = this.groupSubscribers.get(this.globCharacter);
-        if (globsubs && !!netSubscribers.length && !freeze) { // THIS WON'T WORK WITH LONE WILDCARD EVENTS SO, IT WILL BE HANDLED SEPARATELY FOR THEM IN THE `handleLonePublisher`
+        if (globsubs && !!netSubscribers.length && !freeze) {
+            // THIS WON'T WORK WITH LONE WILDCARD EVENTS SO, IT WILL BE HANDLED SEPARATELY FOR THEM IN THE `handleLonePublisher`
             [...globsubs].forEach((subscriber) => {
                 if (!netSubscribersMap.has(subscriber)) {
                     netSubscribers.push(subscriber);
@@ -182,7 +184,8 @@ class RoutePubsubChannel {
             });
         }
         if (netSubscribers.length === 0) {
-            if (!this.isGenericRoute(event)) { // this.handleLonePublisher DEPENDS ON THIS SO, IT JUST FOCUSES ON WILDCARD EVENTS
+            if (!this.isGenericRoute(event)) {
+                // this.handleLonePublisher DEPENDS ON THIS SO, IT JUST FOCUSES ON WILDCARD EVENTS
                 console.warn(`event: ${event} has no subscribers attached to it`);
                 return;
             }
@@ -267,7 +270,7 @@ class GlobalRouteCache {
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                     this.pub(url, opts === null || opts === void 0 ? void 0 : opts.freeze);
                     if (opts === null || opts === void 0 ? void 0 : opts.cascade)
-                        for (let eventUrl of opts.cascade) {
+                        for (let eventUrl of opts === null || opts === void 0 ? void 0 : opts.cascade) {
                             eventUrl = handleTrailing(eventUrl);
                             this.pub(eventUrl, opts === null || opts === void 0 ? void 0 : opts.freeze);
                         }
@@ -296,6 +299,7 @@ class GlobalRouteCache {
     }
     static pub(url, freeze) {
         // MIDDLEWARE IMPLEMENTATION
+        url = handleTrailing(url);
         this.channel.broadcast(url, freeze);
     }
     static sub(url) {
@@ -305,7 +309,7 @@ class GlobalRouteCache {
             return;
         }
         this.channel.subscribe(url, (_b) => __awaiter(this, [_b], void 0, function* ({ cache, routeKeys, }) {
-            const evictPromise = Promise.all(routeKeys.map(el => cache.evict(el)));
+            const evictPromise = Promise.all(routeKeys.map((el) => cache.evict(el)));
             yield evictPromise;
         }));
     }
@@ -317,7 +321,7 @@ class GlobalRouteCache {
     }
     static subAll(url) {
         this.channel.subscribeGroup(url, (_b) => __awaiter(this, [_b], void 0, function* ({ cache, routeKeys, }) {
-            const evictPromise = Promise.all(routeKeys.map(el => cache.evict(el)));
+            const evictPromise = Promise.all(routeKeys.map((el) => cache.evict(el)));
             yield evictPromise;
         }));
     }

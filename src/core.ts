@@ -1,4 +1,5 @@
 import { GlobalRouteCache as OriginalGlobalRouteCache } from "./impl.js";
+import { GlobalCacheInterface, CachedResponseType } from "../types.js";
 
 const handler: ProxyHandler<typeof OriginalGlobalRouteCache> = {
   set(target, prop, _1, receiver) {
@@ -29,5 +30,6 @@ const handler: ProxyHandler<typeof OriginalGlobalRouteCache> = {
 
 const GlobalRouteCache = new Proxy(OriginalGlobalRouteCache, handler);
 
-export { GlobalRouteCache };
+export type { GlobalCacheInterface, CachedResponseType };
+export { GlobalRouteCache }
 export default GlobalRouteCache;

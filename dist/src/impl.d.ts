@@ -34,10 +34,10 @@ declare class GlobalRouteCache {
     static configureGlobalCacheSerializer: (func: (body: CachedResponseType) => string) => void;
     static flushGlobalCache(): Promise<void>;
     static channel: RoutePubsubChannel;
-    static createCacheSubscriber(opts: {
+    static createCacheSubscriber(opts?: {
         catchAll?: boolean;
     }): (req: Request, res: Response, next: NextFunction) => Promise<void>;
-    static createCachePublisher(opts: {
+    static createCachePublisher(opts?: {
         catchAll?: boolean;
         cascade?: string[];
         freeze?: boolean;
