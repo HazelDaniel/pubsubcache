@@ -1,15 +1,4 @@
 import { CachedResponseType, GlobalCacheInterface } from "../types";
-import { RedisClientType } from "redis";
-export declare class RedisCacheClass implements GlobalCacheInterface {
-    client: RedisClientType;
-    constructor();
-    deserializer(body: string): CachedResponseType;
-    serializer(body: CachedResponseType): string;
-    get(key: string): Promise<string | null>;
-    set(key: string, value: any): Promise<void>;
-    evict(key: string): Promise<void>;
-    cleanup(): Promise<void>;
-}
 export declare class cacheClass implements GlobalCacheInterface {
     data: Map<string, any>;
     constructor();
